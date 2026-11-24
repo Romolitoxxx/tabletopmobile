@@ -22,7 +22,7 @@ describe('component actions', () => {
     const s = fixture();
     s.table = {
       ...s.table,
-      grid: { kind: 'square', size: 50, originX: 0, originY: 0, snap: true },
+      grid: { kind: 'square', size: 50, originX: 0, originY: 0, snap: true, bounds: null },
     };
     const r = ok(
       s,
@@ -37,6 +37,34 @@ describe('component actions', () => {
     );
     expect(r.state.components.pawn!.location).toMatchObject({ x: 25, y: 25 });
     expect(r.state.components.board!.location).toMatchObject({ x: 12, y: 40 });
+  });
+
+  it('snaps only inside the grid bounds', () => {
+    const s = fixture();
+    s.table = {
+      ...s.table,
+      grid: {
+        kind: 'square',
+        size: 50,
+        originX: 0,
+        originY: 0,
+        snap: true,
+        bounds: { x: 0, y: 0, w: 100, h: 100 },
+      },
+    };
+    const r = ok(
+      s,
+      {
+        type: 'component.move',
+        targets: [
+          { id: 'pawn', x: 12, y: 40 },
+          { id: 'd1', x: 212, y: 40 },
+        ],
+      },
+      A,
+    );
+    expect(r.state.components.pawn!.location).toMatchObject({ x: 25, y: 25 });
+    expect(r.state.components.d1!.location).toMatchObject({ x: 212, y: 40 });
   });
 
   it('refuses to move locked components and components not on the table', () => {

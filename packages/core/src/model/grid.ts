@@ -28,3 +28,10 @@ export function snapToGrid(grid: Grid, x: number, y: number): { x: number; y: nu
     y: grid.originY + s * (1.5 * rz),
   };
 }
+
+/** True when snapping applies at this point. */
+export function snapsAt(grid: Grid, x: number, y: number): boolean {
+  if (!grid.snap) return false;
+  const b = grid.bounds;
+  return b === null || (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+}

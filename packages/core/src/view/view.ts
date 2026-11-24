@@ -19,7 +19,8 @@ import { exposureFor, isFlippable, maskIdOf, refFor } from '../model/visibility'
 import type { RulesProvider } from '../rules/types';
 import type { JsonValue } from '../util/json';
 
-type Visible<T extends ComponentBase> = Omit<T, 'hideEpoch'>;
+// Distributive, so unions keep their discriminant.
+type Visible<T extends ComponentBase> = T extends ComponentBase ? Omit<T, 'hideEpoch'> : never;
 
 export type DeckView = Omit<Visible<DeckComponent>, 'contents' | 'peeks'> & {
   count: number;
@@ -72,7 +73,7 @@ export interface PlayerView {
 
 function strip<T extends ComponentBase>(c: T): Visible<T> {
   const { hideEpoch: _hideEpoch, ...rest } = c;
-  return rest;
+  return rest as Visible<T>;
 }
 
 function hiddenView(state: GameState, c: Flippable): HiddenView {
