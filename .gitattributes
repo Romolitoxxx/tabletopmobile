@@ -2,3 +2,8 @@
 *.png binary
 *.jpg binary
 *.webp binary
+# Windows scripts must keep CRLF line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.jar binary
+*.keystore binary
