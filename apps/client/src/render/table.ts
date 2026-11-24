@@ -105,6 +105,11 @@ export class TableRenderer {
     });
   }
 
+  /** Re-reads the size of the parent element (e.g. after being shown again). */
+  resize(): void {
+    this.app.resize();
+  }
+
   get canvas(): HTMLCanvasElement {
     return this.app.canvas;
   }

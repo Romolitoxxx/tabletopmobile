@@ -37,8 +37,198 @@ body {
 #app {
   position: fixed;
   inset: 0;
+}
+
+.game {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Home */
+.home {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: calc(16px + var(--safe-top)) 16px calc(24px + var(--safe-bottom));
+  user-select: none;
+}
+
+.home-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home h1 {
+  margin: 8px 0 0;
+  font-size: 28px;
+}
+
+.home h2 {
+  margin: 18px 0 4px;
+  font-size: 18px;
+}
+
+.home-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+button.big {
+  min-height: 56px;
+  font-size: 18px;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  align-self: flex-start;
+  padding-left: 0;
+}
+
+.saves {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saves li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.save-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.save-info span {
+  font-size: 13px;
+}
+
+.save-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Forms */
+.dialog.form label,
+.dialog.form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.dialog select,
+.dialog input[type='text'] {
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.dialog .players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.segmented button {
+  flex: 1;
+}
+
+/* Hotseat */
+.overlay.opaque {
+  background: var(--bg);
+}
+
+.handoff {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.handoff h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 700;
+  color: #212121;
+}
+
+.player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 button {
