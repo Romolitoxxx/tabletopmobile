@@ -10,7 +10,7 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
   - Ciò che arriva al client passa solo da `getViewFor`/`eventsFor`: ogni nuova informazione nascosta richiede un test di non-fuga (vedi `view/visibility.test.ts`).
 - `packages/module-format` — tipi e validazione zod del formato modulo, `ModuleLoader`.
 - `apps/client` — PixiJS + Vite + Capacitor. Gira anche nel browser. Testi solo tramite `i18n` (chiavi in `i18n/en.ts`, traduzione obbligatoria in `i18n/it.ts`).
-- `apps/server` — Colyseus (Node), riusa `packages/core`.
+- `apps/server` — Colyseus (Node), riusa `packages/core`. Logica del tavolo in `OnlineTable` (senza trasporto), adattatore in `TableRoom`. Il protocollo client/server sta in `packages/core/src/net/`.
 
 ## Comandi
 
@@ -20,6 +20,7 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
 - `pnpm --filter @tabletop/core test` — test di un solo pacchetto (anche `pnpm vitest run --project core`).
 - `pnpm lint`, `pnpm typecheck`, `pnpm format`.
 - `pnpm --filter @tabletop/client dev` — client nel browser su http://localhost:5173 (il gioco "Test prestazioni" aggiunge 300 segnalini e mostra gli FPS; Esc = tasto Indietro).
+- `pnpm --filter @tabletop/server dev` — server online su ws://localhost:2567 (`PORT` per cambiarla). Con il client in dev: "Gioca online" → crea un tavolo, e da un'altra scheda/dispositivo entra con il codice.
 - `pnpm --filter @tabletop/client cap:sync` — build web + copia nei progetti nativi; `android:open` / `ios:open` aprono Android Studio / Xcode.
 - APK di debug: lo produce la CI (`.github/workflows/android.yml`, artefatto `tabletop-mobile-debug-apk`).
 

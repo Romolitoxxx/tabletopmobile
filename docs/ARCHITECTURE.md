@@ -37,6 +37,7 @@ Il **core** è puro e deterministico: riceve stato + azione e restituisce un nuo
 | `rng/`     | RNG sfc32 con seed, stato serializzabile                                                |
 | `log/`     | `GameSession`: log, undo, replay, salvataggio                                           |
 | `host/`    | Interfaccia `GameHost` e `LocalHost`                                                    |
+| `net/`     | Protocollo online (messaggi + schemi zod) e `RemoteHost` (indipendente dal trasporto)   |
 
 ### Flusso di un'azione
 
@@ -111,7 +112,7 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
 - **Salvataggio automatico** 400 ms dopo ogni modifica, e subito quando l'app va in background o si chiude (`visibilitychange`, `pagehide`).
 - **Esporta/Importa**: file JSON; all'importazione il file viene validato (zod + replay del log) e riceve un nuovo id, quindi non sovrascrive mai una partita esistente.
 - **Passa-e-gioca** (2–6 giocatori, undo `strict`): quando il turno passa a un altro giocatore compare una schermata opaca "Passa il dispositivo a X". La vista del nuovo giocatore viene richiesta e disegnata **solo dopo** la conferma; la mano del precedente viene tolta dalla pagina prima. "Cambia giocatore" permette di passare il dispositivo fuori turno (sandbox).
-- Limite noto: in locale il salvataggio contiene anche le informazioni segrete (seed, carte coperte). È inevitabile per giocare offline sullo stesso dispositivo; online (M6) i segreti resteranno sul server.
+- Limite noto: in locale il salvataggio contiene anche le informazioni segrete (seed, carte coperte). È inevitabile per giocare offline sullo stesso dispositivo; online (M6) i segreti restano sul server.
 
 ## App native (M5)
 
@@ -128,3 +129,22 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
   - `android.yml`: a ogni push compila l'APK di debug e lo pubblica come artefatto `tabletop-mobile-debug-apk`; il `versionCode` è il numero della build.
   - `ios.yml`: sulle PR (o a mano) compila l'app iOS per il simulatore, senza firma, su un Mac di GitHub: verifica che iOS resti compilabile anche senza un Mac a disposizione.
 - **iOS sul dispositivo**: richiede un Mac con Xcode (o un servizio di build cloud) e un account Apple Developer. Il codice e il progetto sono già pronti.
+
+## Gioco online (M6)
+
+```
+client A ─┐ WebSocket (Colyseus)        ┌─ OnlineTable ── GameSession (autorità: stato, log, RNG)
+client B ─┼──────────────────────────► TableRoom          └─ LocalHost.subscribe(p) → vista filtrata di p
+client C ─┘ submit / start             └─ welcome · table · update · result
+```
+
+- **Server** (`apps/server`): `TableRoom` (adattatore Colyseus, `room.ts`) attorno a `OnlineTable` (`table.ts`), che non dipende dal trasporto ed è testata a parte. Il server riusa `LocalHost` del core: ogni client riceve **solo** `getViewFor`/`eventsFor` del proprio posto. Niente stato Schema di Colyseus.
+- **Protocollo** (`packages/core/src/net/protocol.ts`): opzioni di creazione/ingresso e messaggio `submit` validati con zod lato server; `PROTOCOL_VERSION` rifiuta app di versione diversa con l'errore `protocol`. Messaggi del server: `welcome` (posto + token segreto), `table` (informazioni pubbliche del tavolo), `update` (vista + eventi filtrati), `result` (esito di un `submit`, abbinato per `seq`).
+- **Tavolo**: codice di 5 caratteri senza ambiguità (niente 0/O, 1/I) che è anche l'id della stanza. Chi crea il tavolo è il primo posto e il solo che può iniziare. In sala d'attesa ci si siede con un nome (2–6 posti; si può iniziare anche da soli); all'inizio la partita viene creata con quei giocatori, undo `strict`, seed e chiave delle maschere generati sul server con `crypto`. A partita iniziata non entra nessun altro.
+- **Riconnessione**, su due livelli:
+  - caduta della connessione: l'SDK riprova da solo, il server tiene il posto per 60 s (`allowReconnection`) e alla ripresa rimanda la vista corrente;
+  - rientro (app chiusa, connessione persa a lungo, tasto "Torna al tavolo"): ogni posto ha un **token segreto**, conservato sul dispositivo (Preferences, `tabletop.online.ticket`) e mai inviato agli altri. Con il token si torna allo stesso posto; una nuova connessione con lo stesso token sostituisce la precedente.
+- Il tavolo resta aperto anche se tutti si disconnettono e viene chiuso dopo 30 minuti senza nessuno connesso. **Limite noto**: le partite online vivono in memoria nel processo del server; un riavvio le perde (la persistenza lato server verrà dopo).
+- **Client** (`apps/client/src/net/online.ts`): `OnlineSession` apre la stanza con `@colyseus/sdk` e fornisce un `RemoteHost` al `GameController`, che non sa se la partita è locale o online (modalità `online`: niente passaggio del dispositivo, codice del tavolo nella barra, rosso mentre la connessione è assente). Mentre si è offline le azioni sono rifiutate subito con `error.offline`.
+- **Indirizzo del server**: si scrive nel dialogo "Gioca online" (`192.168.1.5:2567` diventa `ws://192.168.1.5:2567`) e viene ricordato; il valore iniziale è `VITE_SERVER_URL` se definita al build, altrimenti l'host della pagina sulla porta 2567. Per provare in rete locale Android permette `ws://` (cleartext e contenuto misto) e iOS le connessioni locali (`NSAllowsLocalNetworking`); un server pubblico deve usare `wss://`.
+- Limite dei messaggi in ingresso: 64 KB.
