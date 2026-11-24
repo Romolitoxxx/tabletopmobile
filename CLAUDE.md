@@ -19,7 +19,7 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
 - `pnpm test` / `pnpm test:watch` — Vitest su tutti i pacchetti.
 - `pnpm --filter @tabletop/core test` — test di un solo pacchetto (anche `pnpm vitest run --project core`).
 - `pnpm lint`, `pnpm typecheck`, `pnpm format`.
-- `pnpm --filter @tabletop/client dev` — client nel browser su http://localhost:5173 (`?stress=300` per il test di prestazioni).
+- `pnpm --filter @tabletop/client dev` — client nel browser su http://localhost:5173 (il gioco "Test prestazioni" aggiunge 300 segnalini e mostra gli FPS; Esc = tasto Indietro).
 - `pnpm --filter @tabletop/client cap:sync` — build web + copia nei progetti nativi; `android:open` / `ios:open` aprono Android Studio / Xcode.
 - APK di debug: lo produce la CI (`.github/workflows/android.yml`, artefatto `tabletop-mobile-debug-apk`).
 

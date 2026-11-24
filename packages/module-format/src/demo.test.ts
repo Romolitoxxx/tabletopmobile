@@ -42,6 +42,12 @@ describe('demo module', async () => {
     for (const id of session.state.hands.p1!) expect(json).not.toContain(id);
   });
 
+  it('offers a performance test with 300 more components', async () => {
+    const stress = await new BuiltinModuleLoader().load('builtin:stress');
+    const base = Object.keys(demo.createState(players, 'k').components).length;
+    expect(Object.keys(stress.createState(players, 'k').components).length).toBe(base + 300);
+  });
+
   it('rejects unknown modules', async () => {
     await expect(new BuiltinModuleLoader().load('builtin:nope')).rejects.toThrow();
   });

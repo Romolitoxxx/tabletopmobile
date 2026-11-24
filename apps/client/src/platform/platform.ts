@@ -60,9 +60,22 @@ export interface LifecycleHandlers {
 }
 
 export function listenLifecycle(h: LifecycleHandlers): void {
-  if (!isNative()) return;
-  void App.addListener('backButton', () => {
-    if (!h.onBack()) void App.minimizeApp();
-  });
-  void App.addListener('pause', () => h.onPause());
+  if (!isNative()) {
+    // In the browser, Escape behaves like the Android back button.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && h.onBack()) e.preventDefault();
+    });
+    return;
+  }
+  App.addListener('backButton', () => {
+    let handled: boolean;
+    try {
+      handled = h.onBack();
+    } catch (err) {
+      console.error('back handler failed', err);
+      handled = true; // never leave the app because of a bug
+    }
+    if (!handled) void App.minimizeApp();
+  }).catch((err: unknown) => console.error('backButton listener not registered', err));
+  App.addListener('pause', () => h.onPause()).catch(() => {});
 }

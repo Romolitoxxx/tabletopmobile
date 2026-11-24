@@ -98,7 +98,7 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
 - Il client conosce **solo** la `PlayerView` e gli eventi filtrati; ogni modifica passa da `GameHost.submit`. Offline il host è `LocalHost`.
 - Il trascinamento è un'anteprima locale: al rilascio si invia l'azione (sposta, metti nel mazzo/sacchetto, prendi in mano); se è rifiutata, la vista torna quella dell'host.
 - Gesti: tap su un dado = lancio, tap su una carta = lente, pressione lunga (o tasto destro) = menu, Maiusc/Ctrl+clic o "Seleziona" = selezione multipla.
-- Prestazioni: un nodo PixiJS per componente, aggiornato solo se cambia (chiave di cache), texture generate una volta. `?stress=300` aggiunge 300 segnalini per misurare gli fps.
+- Prestazioni: un nodo PixiJS per componente, aggiornato solo se cambia (chiave di cache), texture generate una volta. il gioco "Test prestazioni" (`stressModule`) aggiunge 300 segnalini e mostra un contatore FPS.
 
 ## Modulo demo (`packages/module-format/src/demo.ts`)
 
@@ -119,7 +119,7 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
 - **Codice unico**: tutto ciò che cambia tra browser, Android e iOS sta in `apps/client/src/platform/platform.ts`:
   - impostazioni con Capacitor Preferences (su web usa `localStorage`);
   - esportazione delle partite: foglio di condivisione nativo (Filesystem + Share) su Android/iOS, download nel browser;
-  - tasto/gesto Indietro di Android: chiude il popup in primo piano, altrimenti torna al menu (la schermata di passaggio del dispositivo lo ignora);
+  - tasto/gesto Indietro di Android: chiude il popup in primo piano, altrimenti torna al menu (la schermata di passaggio del dispositivo lo ignora). Nel browser lo stesso comportamento è sul tasto Esc. L'"Indietro predittivo" di Android 15+ è disattivato nel manifest (`enableOnBackInvokedCallback=false`), perché può scavalcare l'ascoltatore di Capacitor;
   - pausa dell'app: salvataggio immediato.
 - **Bordo a bordo**: `viewport-fit=cover`; Android riceve gli spazi delle barre di sistema come variabili CSS `--safe-area-inset-*` (plugin SystemBars, modalità `css`), iOS come `env(safe-area-inset-*)`. Lo stile usa entrambe.
 - **Icona e splash**: generate da `apps/client/assets/generate-icons.py` (Pillow) per entrambe le piattaforme.

@@ -1,5 +1,5 @@
 import './styles.css';
-import { LocalHost, makeToken, type GameSession, type GameState } from '@tabletop/core';
+import { LocalHost, type GameSession } from '@tabletop/core';
 import { BuiltinModuleLoader } from '@tabletop/module-format';
 import { GameController } from './app/controller';
 import { createGame, type GameRecord, restoreGame, updateRecord } from './app/game';
@@ -39,26 +39,6 @@ function openStore(): SaveStore {
     // fall through
   }
   return new MemorySaveStore();
-}
-
-/** `?stress=N` adds N extra tokens to check rendering performance. */
-function withStress(state: GameState): GameState {
-  const stress = Math.min(2000, Number(new URLSearchParams(location.search).get('stress') ?? 0));
-  if (!(stress > 0)) return state;
-  const components = { ...state.components };
-  for (let i = 0; i < stress; i++) {
-    const t = makeToken({
-      id: `stress-${i}`,
-      image: `gen:token:${['red', 'blue', 'green', 'yellow'][i % 4]}`,
-      x: 100 + ((i * 47) % 2200),
-      y: 100 + ((i * 89) % 1400),
-      w: 36,
-      h: 36,
-    });
-    components[t.id] =
-      t.location.kind === 'table' ? { ...t, location: { ...t.location, z: state.nextZ + i } } : t;
-  }
-  return { ...state, components, nextZ: state.nextZ + stress };
 }
 
 class App {
@@ -146,6 +126,7 @@ class App {
     this.current = { record, session, active: record.activePlayerId };
     this.home.el.classList.add('hidden');
     this.gameRoot.classList.remove('hidden');
+    this.controller.showFps(record.moduleId === 'stress');
     await this.controller.load(
       new LocalHost(session),
       record.activePlayerId,
@@ -156,13 +137,8 @@ class App {
 
   private async newGame(choice: NewGameChoice): Promise<void> {
     const module = await this.loader.load(`builtin:${choice.moduleId}`);
-    const stressed = {
-      ...module,
-      createState: (...a: Parameters<typeof module.createState>) =>
-        withStress(module.createState(...a)),
-    };
     const { record, session } = createGame({
-      module: stressed,
+      module,
       mode: choice.mode,
       playerNames: choice.playerNames,
       name: choice.name,

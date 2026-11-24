@@ -83,6 +83,8 @@ export class TableRenderer {
   private readonly nodes = new Map<string, Node>();
   private readonly effects: Effect[] = [];
   private view: PlayerView | null = null;
+  private fpsLabel: HTMLElement | null = null;
+  private fpsTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly assets: Assets) {}
 
@@ -103,6 +105,21 @@ export class TableRenderer {
         if (!this.effects[i]!.update(t.deltaMS)) this.effects.splice(i, 1);
       }
     });
+  }
+
+  showFps(on: boolean): void {
+    if (this.fpsTimer !== null) clearInterval(this.fpsTimer);
+    this.fpsTimer = null;
+    this.fpsLabel?.remove();
+    this.fpsLabel = null;
+    if (!on) return;
+    const label = document.createElement('div');
+    label.className = 'fps';
+    this.app.canvas.parentElement?.append(label);
+    this.fpsLabel = label;
+    this.fpsTimer = setInterval(() => {
+      label.textContent = `${Math.round(this.app.ticker.FPS)} fps · ${this.nodes.size}`;
+    }, 500);
   }
 
   /** Re-reads the size of the parent element (e.g. after being shown again). */
