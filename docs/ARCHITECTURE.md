@@ -103,3 +103,12 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
 ## Modulo demo (`packages/module-format/src/demo.ts`)
 
 52 carte, 2 dadi, tabellone 8×8 con griglia (lo snap vale solo dentro il tabellone: `Grid.bounds`), 12 segnalini, un sacchetto infinito di monete, 2 contatori, una pila degli scarti. Le immagini sono riferimenti `gen:...` disegnati dal client.
+
+## Salvataggi e passa-e-gioca (M4)
+
+- **`GameRecord`** (`apps/client/src/app/game.ts`): nome, modalità (`solo` / `hotseat`), giocatore che ha il dispositivo, date, e il `SavedGame` del core (stato iniziale + log + RNG). Ricaricare = replay del log: la partita torna identica, compresa la casualità futura.
+- **`SaveStore`** (`storage/saves.ts`): `IndexedDbSaveStore` nel browser e nella WebView di Capacitor; `MemorySaveStore` per test e come ripiego. Le impostazioni (lingua) restano in `localStorage`; in M5 passeranno a Capacitor Preferences.
+- **Salvataggio automatico** 400 ms dopo ogni modifica, e subito quando l'app va in background o si chiude (`visibilitychange`, `pagehide`).
+- **Esporta/Importa**: file JSON; all'importazione il file viene validato (zod + replay del log) e riceve un nuovo id, quindi non sovrascrive mai una partita esistente.
+- **Passa-e-gioca** (2–6 giocatori, undo `strict`): quando il turno passa a un altro giocatore compare una schermata opaca "Passa il dispositivo a X". La vista del nuovo giocatore viene richiesta e disegnata **solo dopo** la conferma; la mano del precedente viene tolta dalla pagina prima. "Cambia giocatore" permette di passare il dispositivo fuori turno (sandbox).
+- Limite noto: in locale il salvataggio contiene anche le informazioni segrete (seed, carte coperte). È inevitabile per giocare offline sullo stesso dispositivo; online (M6) i segreti resteranno sul server.
