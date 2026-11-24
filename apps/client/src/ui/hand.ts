@@ -43,6 +43,12 @@ export class HandBar {
     this.el.classList.toggle('drop-target', on);
   }
 
+  /** Removes every card (e.g. while the device changes hands). */
+  clear(): void {
+    this.cards = [];
+    this.el.replaceChildren();
+  }
+
   update(view: PlayerView): void {
     const byId = new Map(view.components.map((c) => [c.id, c]));
     this.cards = view.hand

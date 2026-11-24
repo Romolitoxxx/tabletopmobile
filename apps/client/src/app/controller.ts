@@ -8,6 +8,7 @@ import type {
   PlayerView,
 } from '@tabletop/core';
 import type { I18n, MessageKey } from '../i18n/i18n';
+import { choosePlayer, showHandoff } from '../ui/handoff';
 import { Gestures } from '../input/gestures';
 import type { Assets } from '../render/assets';
 import { hitTest } from '../render/hit';
@@ -17,6 +18,7 @@ import { HandBar } from '../ui/hand';
 import { LogPanel } from '../ui/log';
 import { askNumber, showGallery, showMenu, showZoom, toast, type ZoomAction } from '../ui/popups';
 import { componentName, formatEvent, playerName } from './format';
+import { type GameMode, handoffTarget } from './game';
 import { buildMenu, type MenuItem } from './menu';
 
 interface DragState {
@@ -28,8 +30,10 @@ interface DragState {
 }
 
 export interface ControllerOptions {
-  onNewGame(): void;
-  onLocaleChange(): void;
+  /** Back to the home screen. */
+  onExit(): void;
+  /** The game changed (or the device changed hands): time to save. */
+  onChange(activePlayerId: string): void;
 }
 
 /** Connects a GameHost to the table, the hand and the panels. */
@@ -41,6 +45,8 @@ export class GameController {
   private selection = new Set<string>();
   private drag: DragState | null = null;
   private fitted = false;
+  private mode: GameMode = 'solo';
+  private switching = false;
 
   private readonly renderer: TableRenderer;
   private readonly hand: HandBar;
@@ -90,16 +96,55 @@ export class GameController {
     });
   }
 
-  /** Attaches a (new) game. */
-  async load(host: GameHost, playerId: string): Promise<void> {
-    this.unsubscribe?.();
+  /**
+   * Attaches a game. With `handoff`, the device is first handed to the
+   * player (hotseat): nothing of their view is shown before they confirm.
+   */
+  async load(host: GameHost, playerId: string, mode: GameMode, handoff: boolean): Promise<void> {
+    this.detach();
     this.host = host;
-    this.playerId = playerId;
-    this.selection.clear();
+    this.mode = mode;
     this.fitted = false;
     this.log.clear();
-    this.unsubscribe = host.subscribe(playerId, (u) => this.onUpdate(u));
-    this.setView(await host.getView(playerId));
+    this.renderer.resize();
+    if (handoff) {
+      await this.switchTo(playerId);
+    } else {
+      await this.attachPlayer(playerId);
+    }
+  }
+
+  /** Stops listening to the current game. */
+  detach(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.view = null;
+    this.selection.clear();
+  }
+
+  private async attachPlayer(playerId: string): Promise<void> {
+    if (!this.host) return;
+    this.unsubscribe?.();
+    this.playerId = playerId;
+    this.selection.clear();
+    this.unsubscribe = this.host.subscribe(playerId, (u) => this.onUpdate(u));
+    this.setView(await this.host.getView(playerId));
+  }
+
+  /** Hands the device to another player (hotseat). */
+  private async switchTo(playerId: string): Promise<void> {
+    if (this.switching || !this.host) return;
+    this.switching = true;
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    // The previous player's hand must not stay on screen (or in the page) during the handoff.
+    this.hand.clear();
+    const view = await this.host.getView(playerId);
+    const player = view.players.find((p) => p.id === playerId);
+    await showHandoff(player?.name ?? playerId, player?.color ?? '#ffffff', this.i18n);
+    this.switching = false;
+    await this.attachPlayer(playerId);
+    this.options.onChange(playerId);
   }
 
   /** Re-renders every translated text. */
@@ -129,6 +174,9 @@ export class GameController {
     this.setView(u.view);
     this.log.add(u.events.filter((e) => e.type !== 'moved'));
     for (const e of u.events) this.playEffect(e);
+    this.options.onChange(this.playerId);
+    const next = handoffTarget(this.mode, u.view, this.playerId);
+    if (next) void this.switchTo(next);
   }
 
   private playEffect(e: GameEvent): void {
@@ -429,6 +477,15 @@ export class GameController {
 
   // ---------- toolbar ----------
 
+  private async pickPlayer(): Promise<void> {
+    if (!this.view) return;
+    const players = this.view.players.filter(
+      (p) => p.role !== 'spectator' && p.id !== this.playerId,
+    );
+    const id = await choosePlayer(players, this.i18n);
+    if (id) await this.switchTo(id);
+  }
+
   private renderToolbar(): void {
     const t = (k: MessageKey) => this.i18n.t(k);
     if (this.view) {
@@ -447,10 +504,10 @@ export class GameController {
         button(t('toolbar.undo'), () => void this.submit({ type: 'game.undo' })),
         button(t('toolbar.endTurn'), () => void this.submit({ type: 'turn.end' })),
         button(t('toolbar.log'), () => this.log.toggle()),
-        button(t('toolbar.language'), () => this.options.onLocaleChange()),
-        button(t('toolbar.newGame'), () => {
-          if (window.confirm(t('confirm.newGame'))) this.options.onNewGame();
-        }),
+        this.mode === 'hotseat'
+          ? button(t('toolbar.switchPlayer'), () => void this.pickPlayer())
+          : null,
+        button(t('toolbar.menu'), () => this.options.onExit()),
       ),
     );
   }
