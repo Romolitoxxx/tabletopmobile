@@ -4,6 +4,7 @@ import { BuiltinModuleLoader } from '@tabletop/module-format';
 import { GameController } from './app/controller';
 import { createGame, type GameRecord, restoreGame, updateRecord } from './app/game';
 import { detectLocale, I18n, type Locale } from './i18n/i18n';
+import { listenLifecycle, settings, shareTextFile } from './platform/platform';
 import { Assets } from './render/assets';
 import {
   exportRecord,
@@ -19,21 +20,9 @@ import { toast } from './ui/popups';
 const LOCALE_KEY = 'tabletop.locale';
 const AUTOSAVE_DELAY_MS = 400;
 
-function loadLocale(): Locale | null {
-  try {
-    const v = localStorage.getItem(LOCALE_KEY);
-    return v === 'it' || v === 'en' ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLocale(locale: Locale): void {
-  try {
-    localStorage.setItem(LOCALE_KEY, locale);
-  } catch {
-    // Storage may be unavailable (private mode): the choice just isn't remembered.
-  }
+async function loadLocale(): Promise<Locale | null> {
+  const v = await settings.get(LOCALE_KEY);
+  return v === 'it' || v === 'en' ? v : null;
 }
 
 /** Secret random string for seeds, opaque ids and record ids. */
@@ -72,17 +61,8 @@ function withStress(state: GameState): GameState {
   return { ...state, components, nextZ: state.nextZ + stress };
 }
 
-function download(filename: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = h('a', { href: url, download: filename });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 class App {
-  private readonly i18n = new I18n(loadLocale() ?? detectLocale(navigator.languages));
+  private readonly i18n = new I18n(detectLocale(navigator.languages));
   private readonly store = openStore();
   private readonly loader = new BuiltinModuleLoader();
   private readonly gameRoot = h('div', { class: 'game hidden' });
@@ -111,9 +91,27 @@ class App {
       if (document.visibilityState === 'hidden') void this.flush();
     });
     window.addEventListener('pagehide', () => void this.flush());
+    listenLifecycle({ onBack: () => this.back(), onPause: () => void this.flush() });
+  }
+
+  /** Android back: close the topmost popup, else leave the game. */
+  private back(): boolean {
+    const layers = document.querySelectorAll<HTMLElement>('.overlay');
+    const top = layers[layers.length - 1];
+    if (top) {
+      // Same as tapping outside the popup (the handoff screen ignores it).
+      top.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      return true;
+    }
+    if (this.current) {
+      void this.flush().then(() => this.showHome());
+      return true;
+    }
+    return false;
   }
 
   async start(): Promise<void> {
+    this.i18n.locale = (await loadLocale()) ?? this.i18n.locale;
     this.applyLocale();
     await this.controller.init();
     await this.showHome();
@@ -126,7 +124,7 @@ class App {
 
   private toggleLocale(): void {
     this.i18n.locale = this.i18n.locale === 'it' ? 'en' : 'it';
-    saveLocale(this.i18n.locale);
+    void settings.set(LOCALE_KEY, this.i18n.locale);
     this.applyLocale();
     this.home.render();
     this.controller.refreshTexts();
@@ -189,7 +187,11 @@ class App {
     const record = await this.store.get(id);
     if (!record) return;
     const safe = record.name.replace(/[^\p{L}\p{N}-]+/gu, '_').slice(0, 40);
-    download(`tabletop-${safe}.json`, exportRecord(record));
+    try {
+      await shareTextFile(`tabletop-${safe}.json`, exportRecord(record), record.name);
+    } catch {
+      // The user closed the share sheet: nothing to do.
+    }
   }
 
   private async importGame(text: string): Promise<void> {
