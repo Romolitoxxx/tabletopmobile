@@ -59,15 +59,11 @@ export interface LifecycleHandlers {
   onPause(): void;
 }
 
+/** Native event sent by MainActivity (Android) for the back button/gesture. */
+export const NATIVE_BACK_EVENT = 'tabletopback';
+
 export function listenLifecycle(h: LifecycleHandlers): void {
-  if (!isNative()) {
-    // In the browser, Escape behaves like the Android back button.
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && h.onBack()) e.preventDefault();
-    });
-    return;
-  }
-  App.addListener('backButton', () => {
+  const back = (): void => {
     let handled: boolean;
     try {
       handled = h.onBack();
@@ -75,7 +71,19 @@ export function listenLifecycle(h: LifecycleHandlers): void {
       console.error('back handler failed', err);
       handled = true; // never leave the app because of a bug
     }
-    if (!handled) void App.minimizeApp();
-  }).catch((err: unknown) => console.error('backButton listener not registered', err));
+    if (!handled && isNative()) void App.minimizeApp();
+  };
+  if (!isNative()) {
+    // In the browser, Escape behaves like the Android back button.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        back();
+      }
+    });
+    return;
+  }
+  // Android: MainActivity intercepts the back button and fires this event.
+  document.addEventListener(NATIVE_BACK_EVENT, back);
   App.addListener('pause', () => h.onPause()).catch(() => {});
 }

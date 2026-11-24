@@ -119,7 +119,7 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
 - **Codice unico**: tutto ciò che cambia tra browser, Android e iOS sta in `apps/client/src/platform/platform.ts`:
   - impostazioni con Capacitor Preferences (su web usa `localStorage`);
   - esportazione delle partite: foglio di condivisione nativo (Filesystem + Share) su Android/iOS, download nel browser;
-  - tasto/gesto Indietro di Android: chiude il popup in primo piano, altrimenti torna al menu (la schermata di passaggio del dispositivo lo ignora). Nel browser lo stesso comportamento è sul tasto Esc. L'"Indietro predittivo" di Android 15+ è disattivato nel manifest (`enableOnBackInvokedCallback=false`), perché può scavalcare l'ascoltatore di Capacitor;
+  - tasto/gesto Indietro di Android: chiude il popup in primo piano, altrimenti torna al menu (la schermata di passaggio del dispositivo lo ignora). Nel browser lo stesso comportamento è sul tasto Esc. Il tasto è intercettato in `MainActivity.java`, che lo inoltra alla pagina come evento `tabletopback` su `document` (l'ascoltatore del plugin App non riceveva l'evento su Samsung S24); l'"Indietro predittivo" è disattivato nel manifest. Se la pagina non lo gestisce, l'app viene minimizzata (mai chiusa);
   - pausa dell'app: salvataggio immediato.
 - **Bordo a bordo**: `viewport-fit=cover`; Android riceve gli spazi delle barre di sistema come variabili CSS `--safe-area-inset-*` (plugin SystemBars, modalità `css`), iOS come `env(safe-area-inset-*)`. Lo stile usa entrambe.
 - **Icona e splash**: generate da `apps/client/assets/generate-icons.py` (Pillow) per entrambe le piattaforme.

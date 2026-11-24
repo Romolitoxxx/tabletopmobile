@@ -425,6 +425,14 @@ button.primary {
   min-height: 44px;
 }
 
+.menu-cancel {
+  margin-top: 4px;
+  border-top: 1px solid var(--panel-border);
+  border-radius: 0;
+  color: var(--muted);
+  text-align: center;
+}
+
 @media (max-width: 520px) {
   .toolbar {
     flex-wrap: wrap;
