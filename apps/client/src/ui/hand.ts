@@ -4,7 +4,10 @@ import type { Assets } from '../render/assets';
 import { h } from './dom';
 
 const CARD_W = 72;
-const DRAG_THRESHOLD = 12;
+const DRAG_THRESHOLD_TOUCH = 20;
+const DRAG_THRESHOLD_MOUSE = 8;
+/** A dragged card is played only when released this far above the hand. */
+const DROP_MARGIN = 24;
 
 export interface HandHandlers {
   onCardTap(id: string): void;
@@ -29,6 +32,11 @@ export class HandBar {
   contains(clientX: number, clientY: number): boolean {
     const r = this.el.getBoundingClientRect();
     return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+  }
+
+  /** True if a card released here should leave the hand. */
+  private isDropOutside(clientY: number): boolean {
+    return clientY < this.el.getBoundingClientRect().top - DROP_MARGIN;
   }
 
   setHighlight(on: boolean): void {
@@ -84,14 +92,16 @@ export class HandBar {
 
   private attachDrag(img: HTMLImageElement, id: string): void {
     let start: { x: number; y: number } | null = null;
+    let threshold = DRAG_THRESHOLD_TOUCH;
     let ghost: HTMLImageElement | null = null;
     img.addEventListener('pointerdown', (e) => {
       img.setPointerCapture(e.pointerId);
       start = { x: e.clientX, y: e.clientY };
+      threshold = e.pointerType === 'mouse' ? DRAG_THRESHOLD_MOUSE : DRAG_THRESHOLD_TOUCH;
     });
     img.addEventListener('pointermove', (e) => {
       if (!start) return;
-      if (!ghost && Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_THRESHOLD) {
+      if (!ghost && Math.hypot(e.clientX - start.x, e.clientY - start.y) > threshold) {
         ghost = img.cloneNode() as HTMLImageElement;
         ghost.className = 'drag-ghost';
         document.body.append(ghost);
@@ -109,7 +119,7 @@ export class HandBar {
       if (ghost) {
         ghost.remove();
         ghost = null;
-        if (!cancelled && !this.contains(e.clientX, e.clientY))
+        if (!cancelled && this.isDropOutside(e.clientY))
           this.handlers.onCardDrop(id, e.clientX, e.clientY);
       } else if (!cancelled) {
         this.handlers.onCardTap(id);
