@@ -1,0 +1,382 @@
+:root {
+  --bg: #12241a;
+  --panel: rgba(18, 24, 22, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --text: #f1f5f2;
+  --muted: #9fb3a8;
+  --accent: #ffca28;
+  --hand-h: 128px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+button:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+button.primary {
+  background: var(--accent);
+  color: #212121;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(6px + var(--safe-top)) 10px 6px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  z-index: 5;
+}
+
+.toolbar .turn {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.toolbar .tools {
+  margin-left: auto;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbar .tools button {
+  white-space: nowrap;
+  padding: 6px 10px;
+}
+
+/* Table */
+.table {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.table canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* Hand */
+.hand {
+  position: relative;
+  height: calc(var(--hand-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.35));
+  border-top: 1px solid var(--panel-border);
+  overflow: hidden;
+  touch-action: none;
+  transition: background 0.15s;
+}
+
+.hand.drop-target {
+  background: rgba(255, 202, 40, 0.35);
+}
+
+.hand-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.hand-card {
+  position: absolute;
+  top: 14px;
+  width: 72px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transform-origin: 50% 120%;
+  transition:
+    transform 0.15s,
+    left 0.15s;
+  touch-action: none;
+}
+
+.hand-card:active {
+  transform: translateY(-18px) !important;
+}
+
+.drag-ghost {
+  position: fixed;
+  width: 72px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  opacity: 0.9;
+}
+
+/* Log */
+.log {
+  position: absolute;
+  top: calc(56px + var(--safe-top));
+  right: 8px;
+  width: min(340px, calc(100% - 16px));
+  max-height: calc(100% - var(--hand-h) - 80px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  z-index: 6;
+  user-select: text;
+}
+
+.log.hidden {
+  display: none;
+}
+
+.log h2 {
+  font-size: 15px;
+  margin: 4px 0 8px;
+}
+
+.log ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+.log li {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Popups */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.menu {
+  position: absolute;
+  min-width: 200px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.menu-item {
+  text-align: left;
+  border: none;
+  background: transparent;
+  min-height: 44px;
+}
+
+@media (max-width: 520px) {
+  .toolbar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .toolbar .turn {
+    flex: 1 0 100%;
+    font-size: 14px;
+  }
+
+  .toolbar .tools {
+    margin-left: 0;
+  }
+}
+
+/* On phones in portrait the menu is a bottom sheet. */
+@media (max-width: 520px) {
+  .menu {
+    left: 0 !important;
+    right: 0;
+    top: auto !important;
+    bottom: 0;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(8px + var(--safe-bottom));
+    max-height: 70%;
+  }
+}
+
+.dialog {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.dialog h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.dialog input {
+  width: 100%;
+  font-size: 20px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+}
+
+.row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.gallery {
+  width: min(720px, calc(100% - 24px));
+}
+
+.gallery .cards {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.gallery figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+}
+
+.gallery img {
+  width: 96px;
+  border-radius: 8px;
+}
+
+.zoom {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.zoom img {
+  max-width: min(360px, 80vw);
+  max-height: 60vh;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.zoom .actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+  max-width: 600px;
+}
+
+.zoom .actions button {
+  background: var(--panel);
+}
+
+.toast {
+  position: fixed;
+  top: calc(64px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: #b71c1c;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  z-index: 40;
+  transition: opacity 0.4s;
+  max-width: calc(100% - 32px);
+}
+
+.toast.hide {
+  opacity: 0;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --hand-h: 96px;
+  }
+
+  .hand-card {
+    top: 8px;
+    width: 58px;
+  }
+}
