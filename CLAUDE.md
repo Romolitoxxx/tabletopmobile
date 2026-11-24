@@ -5,7 +5,9 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
 
 ## Struttura
 
-- `packages/core` — motore di gioco puro (stato JSON + azioni). **Nessuna dipendenza da UI, rete o piattaforma** (imposto da ESLint).
+- `packages/core` — motore di gioco puro (stato JSON + azioni). **Nessuna dipendenza da UI, rete o piattaforma** (imposto da ESLint). Unica dipendenza: zod.
+  - Ogni modifica passa da `applyAction` (pipeline regole) → `applyResolved` (reducer puro). Nuova azione = schema in `actions/schema.ts` + handler in `actions/apply.ts` + `resolveRefs` in `rules/pipeline.ts` + test.
+  - Ciò che arriva al client passa solo da `getViewFor`/`eventsFor`: ogni nuova informazione nascosta richiede un test di non-fuga (vedi `view/visibility.test.ts`).
 - `packages/module-format` — tipi e validazione zod del formato modulo, `ModuleLoader`.
 - `apps/client` — PixiJS + Vite + Capacitor. Gira anche nel browser.
 - `apps/server` — Colyseus (Node), riusa `packages/core`.
