@@ -9,7 +9,7 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
   - Ogni modifica passa da `applyAction` (pipeline regole) → `applyResolved` (reducer puro). Nuova azione = schema in `actions/schema.ts` + handler in `actions/apply.ts` + `resolveRefs` in `rules/pipeline.ts` + test.
   - Ciò che arriva al client passa solo da `getViewFor`/`eventsFor`: ogni nuova informazione nascosta richiede un test di non-fuga (vedi `view/visibility.test.ts`).
 - `packages/module-format` — tipi e validazione zod del formato modulo, `ModuleLoader`.
-- `apps/client` — PixiJS + Vite + Capacitor. Gira anche nel browser.
+- `apps/client` — PixiJS + Vite + Capacitor. Gira anche nel browser. Testi solo tramite `i18n` (chiavi in `i18n/en.ts`, traduzione obbligatoria in `i18n/it.ts`).
 - `apps/server` — Colyseus (Node), riusa `packages/core`.
 
 ## Comandi
@@ -19,7 +19,7 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
 - `pnpm test` / `pnpm test:watch` — Vitest su tutti i pacchetti.
 - `pnpm --filter @tabletop/core test` — test di un solo pacchetto (anche `pnpm vitest run --project core`).
 - `pnpm lint`, `pnpm typecheck`, `pnpm format`.
-- `pnpm --filter @tabletop/client dev` — client nel browser.
+- `pnpm --filter @tabletop/client dev` — client nel browser su http://localhost:5173 (`?stress=300` per il test di prestazioni).
 
 ## Convenzioni
 

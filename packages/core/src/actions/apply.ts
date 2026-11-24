@@ -1,4 +1,4 @@
-import { snapToGrid } from '../model/grid';
+import { snapToGrid, snapsAt } from '../model/grid';
 import type {
   Component,
   ComponentId,
@@ -95,7 +95,7 @@ function assertPlayer(d: Draft, pid: PlayerId): void {
 
 function tablePoint(d: Draft, c: Component, x: number, y: number): { x: number; y: number } {
   const grid = d.s.table.grid;
-  return grid?.snap && c.type !== 'board' ? snapToGrid(grid, x, y) : { x, y };
+  return grid && c.type !== 'board' && snapsAt(grid, x, y) ? snapToGrid(grid, x, y) : { x, y };
 }
 
 /** Detaches a component from its current hand or container. */

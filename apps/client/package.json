@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@tabletop/core": "workspace:*"
+    "@tabletop/core": "workspace:*",
+    "@tabletop/module-format": "workspace:*",
+    "pixi.js": "^8.23.0"
   },
   "devDependencies": {
     "vite": "^8.3.8"

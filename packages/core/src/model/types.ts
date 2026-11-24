@@ -115,6 +115,8 @@ export interface Grid {
   originX: number;
   originY: number;
   snap: boolean;
+  /** Area where snapping applies (e.g. the board); null = the whole table. */
+  bounds: { x: number; y: number; w: number; h: number } | null;
 }
 
 export interface Table {

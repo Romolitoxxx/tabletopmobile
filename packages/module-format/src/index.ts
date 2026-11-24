@@ -36,3 +36,6 @@ export interface LoadedModule {
 export interface ModuleLoader {
   load(source: string): Promise<LoadedModule>;
 }
+
+export * from './demo';
+export * from './builtin';
