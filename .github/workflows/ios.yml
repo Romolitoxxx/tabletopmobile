@@ -1,0 +1,29 @@
+name: iOS
+
+# Checks that the iOS project still compiles (simulator, no signing).
+# macOS runners are expensive: only on pull requests and on demand.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tabletop/client build
+      - name: Copy the web app into the iOS project
+        working-directory: apps/client
+        run: pnpm exec cap sync ios
+      - name: Build for the simulator
+        working-directory: apps/client/ios/App
+        run: >
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build

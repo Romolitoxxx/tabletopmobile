@@ -119,3 +119,39 @@ export const demoModule: LoadedModule = {
   createState: createDemoState,
   assetUrl: (ref) => ref,
 };
+
+/** Number of extra tokens in the performance test module. */
+export const STRESS_TOKENS = 300;
+
+export const stressManifest: ModuleManifest = {
+  id: 'stress',
+  name: 'Test prestazioni / Performance test',
+  version: '1.0.0',
+  rulesLevel: 'sandbox',
+};
+
+/** The demo table plus many tokens, to measure rendering performance. */
+export function createStressState(players: Player[], maskKey: string): GameState {
+  const base = createDemoState(players, maskKey);
+  const components = { ...base.components };
+  const colors = ['red', 'blue', 'green', 'yellow'] as const;
+  for (let i = 0; i < STRESS_TOKENS; i++) {
+    const t = makeToken({
+      id: `stress-${i}`,
+      image: `gen:token:${colors[i % colors.length]}`,
+      x: 100 + ((i * 47) % 2200),
+      y: 100 + ((i * 89) % 1400),
+      w: 36,
+      h: 36,
+    });
+    components[t.id] =
+      t.location.kind === 'table' ? { ...t, location: { ...t.location, z: base.nextZ + i } } : t;
+  }
+  return { ...base, components, nextZ: base.nextZ + STRESS_TOKENS };
+}
+
+export const stressModule: LoadedModule = {
+  manifest: stressManifest,
+  createState: createStressState,
+  assetUrl: (ref) => ref,
+};

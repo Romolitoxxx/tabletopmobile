@@ -1,9 +1,10 @@
 import './styles.css';
-import { LocalHost, makeToken, type GameSession, type GameState } from '@tabletop/core';
+import { LocalHost, type GameSession } from '@tabletop/core';
 import { BuiltinModuleLoader } from '@tabletop/module-format';
 import { GameController } from './app/controller';
 import { createGame, type GameRecord, restoreGame, updateRecord } from './app/game';
 import { detectLocale, I18n, type Locale } from './i18n/i18n';
+import { listenLifecycle, settings, shareTextFile } from './platform/platform';
 import { Assets } from './render/assets';
 import {
   exportRecord,
@@ -19,21 +20,9 @@ import { toast } from './ui/popups';
 const LOCALE_KEY = 'tabletop.locale';
 const AUTOSAVE_DELAY_MS = 400;
 
-function loadLocale(): Locale | null {
-  try {
-    const v = localStorage.getItem(LOCALE_KEY);
-    return v === 'it' || v === 'en' ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLocale(locale: Locale): void {
-  try {
-    localStorage.setItem(LOCALE_KEY, locale);
-  } catch {
-    // Storage may be unavailable (private mode): the choice just isn't remembered.
-  }
+async function loadLocale(): Promise<Locale | null> {
+  const v = await settings.get(LOCALE_KEY);
+  return v === 'it' || v === 'en' ? v : null;
 }
 
 /** Secret random string for seeds, opaque ids and record ids. */
@@ -52,37 +41,8 @@ function openStore(): SaveStore {
   return new MemorySaveStore();
 }
 
-/** `?stress=N` adds N extra tokens to check rendering performance. */
-function withStress(state: GameState): GameState {
-  const stress = Math.min(2000, Number(new URLSearchParams(location.search).get('stress') ?? 0));
-  if (!(stress > 0)) return state;
-  const components = { ...state.components };
-  for (let i = 0; i < stress; i++) {
-    const t = makeToken({
-      id: `stress-${i}`,
-      image: `gen:token:${['red', 'blue', 'green', 'yellow'][i % 4]}`,
-      x: 100 + ((i * 47) % 2200),
-      y: 100 + ((i * 89) % 1400),
-      w: 36,
-      h: 36,
-    });
-    components[t.id] =
-      t.location.kind === 'table' ? { ...t, location: { ...t.location, z: state.nextZ + i } } : t;
-  }
-  return { ...state, components, nextZ: state.nextZ + stress };
-}
-
-function download(filename: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = h('a', { href: url, download: filename });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 class App {
-  private readonly i18n = new I18n(loadLocale() ?? detectLocale(navigator.languages));
+  private readonly i18n = new I18n(detectLocale(navigator.languages));
   private readonly store = openStore();
   private readonly loader = new BuiltinModuleLoader();
   private readonly gameRoot = h('div', { class: 'game hidden' });
@@ -111,9 +71,27 @@ class App {
       if (document.visibilityState === 'hidden') void this.flush();
     });
     window.addEventListener('pagehide', () => void this.flush());
+    listenLifecycle({ onBack: () => this.back(), onPause: () => void this.flush() });
+  }
+
+  /** Android back: close the topmost popup, else leave the game. */
+  private back(): boolean {
+    const layers = document.querySelectorAll<HTMLElement>('.overlay');
+    const top = layers[layers.length - 1];
+    if (top) {
+      // Same as tapping outside the popup (the handoff screen ignores it).
+      top.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      return true;
+    }
+    if (this.current) {
+      void this.flush().then(() => this.showHome());
+      return true;
+    }
+    return false;
   }
 
   async start(): Promise<void> {
+    this.i18n.locale = (await loadLocale()) ?? this.i18n.locale;
     this.applyLocale();
     await this.controller.init();
     await this.showHome();
@@ -126,7 +104,7 @@ class App {
 
   private toggleLocale(): void {
     this.i18n.locale = this.i18n.locale === 'it' ? 'en' : 'it';
-    saveLocale(this.i18n.locale);
+    void settings.set(LOCALE_KEY, this.i18n.locale);
     this.applyLocale();
     this.home.render();
     this.controller.refreshTexts();
@@ -148,6 +126,7 @@ class App {
     this.current = { record, session, active: record.activePlayerId };
     this.home.el.classList.add('hidden');
     this.gameRoot.classList.remove('hidden');
+    this.controller.showFps(record.moduleId === 'stress');
     await this.controller.load(
       new LocalHost(session),
       record.activePlayerId,
@@ -158,13 +137,8 @@ class App {
 
   private async newGame(choice: NewGameChoice): Promise<void> {
     const module = await this.loader.load(`builtin:${choice.moduleId}`);
-    const stressed = {
-      ...module,
-      createState: (...a: Parameters<typeof module.createState>) =>
-        withStress(module.createState(...a)),
-    };
     const { record, session } = createGame({
-      module: stressed,
+      module,
       mode: choice.mode,
       playerNames: choice.playerNames,
       name: choice.name,
@@ -189,7 +163,11 @@ class App {
     const record = await this.store.get(id);
     if (!record) return;
     const safe = record.name.replace(/[^\p{L}\p{N}-]+/gu, '_').slice(0, 40);
-    download(`tabletop-${safe}.json`, exportRecord(record));
+    try {
+      await shareTextFile(`tabletop-${safe}.json`, exportRecord(record), record.name);
+    } catch {
+      // The user closed the share sheet: nothing to do.
+    }
   }
 
   private async importGame(text: string): Promise<void> {

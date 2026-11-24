@@ -147,6 +147,11 @@ export class GameController {
     this.options.onChange(playerId);
   }
 
+  /** Shows a frames-per-second counter (performance test). */
+  showFps(on: boolean): void {
+    this.renderer.showFps(on);
+  }
+
   /** Re-renders every translated text. */
   refreshTexts(): void {
     this.renderToolbar();

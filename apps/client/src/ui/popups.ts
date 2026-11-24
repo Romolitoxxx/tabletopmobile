@@ -30,6 +30,7 @@ export function showMenu(
         i18n.t(item.key),
       ),
     ),
+    h('button', { class: 'menu-item menu-cancel', onclick: close }, i18n.t('menu.cancel')),
   );
   layer = overlay(close, list);
   const r = list.getBoundingClientRect();
