@@ -20,6 +20,8 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
 - `pnpm --filter @tabletop/core test` — test di un solo pacchetto (anche `pnpm vitest run --project core`).
 - `pnpm lint`, `pnpm typecheck`, `pnpm format`.
 - `pnpm --filter @tabletop/client dev` — client nel browser su http://localhost:5173 (`?stress=300` per il test di prestazioni).
+- `pnpm --filter @tabletop/client cap:sync` — build web + copia nei progetti nativi; `android:open` / `ios:open` aprono Android Studio / Xcode.
+- APK di debug: lo produce la CI (`.github/workflows/android.yml`, artefatto `tabletop-mobile-debug-apk`).
 
 ## Convenzioni
 
@@ -31,4 +33,5 @@ Architettura: vedi `docs/ARCHITECTURE.md`.
 - Le funzioni del core sono pure: mai mutare lo stato in ingresso, mai usare `Math.random()` o l'orologio. La casualità passa solo dall'RNG con seed nello stato.
 - Ogni azione nuova richiede test, compresi quelli di visibilità quando tocca informazione nascosta.
 - Una milestone = un branch (`mN-nome`) + PR verso `main`. Commit piccoli. Prima di chiudere: `pnpm check` verde.
+- Codice specifico di piattaforma (Capacitor) solo in `apps/client/src/platform/`; ogni funzione nativa deve avere l'equivalente iOS e il ripiego web.
 - Aggiornare questo file e `docs/ARCHITECTURE.md` quando cambiano comandi o architettura.

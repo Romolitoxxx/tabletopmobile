@@ -112,3 +112,19 @@ Ogni componente ha, per ogni osservatore, un'esposizione `full` (tutto), `back` 
 - **Esporta/Importa**: file JSON; all'importazione il file viene validato (zod + replay del log) e riceve un nuovo id, quindi non sovrascrive mai una partita esistente.
 - **Passa-e-gioca** (2–6 giocatori, undo `strict`): quando il turno passa a un altro giocatore compare una schermata opaca "Passa il dispositivo a X". La vista del nuovo giocatore viene richiesta e disegnata **solo dopo** la conferma; la mano del precedente viene tolta dalla pagina prima. "Cambia giocatore" permette di passare il dispositivo fuori turno (sandbox).
 - Limite noto: in locale il salvataggio contiene anche le informazioni segrete (seed, carte coperte). È inevitabile per giocare offline sullo stesso dispositivo; online (M6) i segreti resteranno sul server.
+
+## App native (M5)
+
+- **Capacitor 8** con i progetti nativi in `apps/client/android` (Gradle) e `apps/client/ios` (Xcode, Swift Package Manager: niente CocoaPods). Sono versionati; la copia della web app (`assets/public`, `App/public`) no: la genera `cap sync`.
+- **Codice unico**: tutto ciò che cambia tra browser, Android e iOS sta in `apps/client/src/platform/platform.ts`:
+  - impostazioni con Capacitor Preferences (su web usa `localStorage`);
+  - esportazione delle partite: foglio di condivisione nativo (Filesystem + Share) su Android/iOS, download nel browser;
+  - tasto/gesto Indietro di Android: chiude il popup in primo piano, altrimenti torna al menu (la schermata di passaggio del dispositivo lo ignora);
+  - pausa dell'app: salvataggio immediato.
+- **Bordo a bordo**: `viewport-fit=cover`; Android riceve gli spazi delle barre di sistema come variabili CSS `--safe-area-inset-*` (plugin SystemBars, modalità `css`), iOS come `env(safe-area-inset-*)`. Lo stile usa entrambe.
+- **Icona e splash**: generate da `apps/client/assets/generate-icons.py` (Pillow) per entrambe le piattaforme.
+- **Firma di debug**: `android/app/debug.keystore` è una chiave di debug _non segreta_ (password `android`) versionata di proposito, così ogni APK di debug si installa sopra il precedente senza perdere le partite. Per il Play Store servirà una chiave di rilascio separata, **mai** nel repository.
+- **CI**:
+  - `android.yml`: a ogni push compila l'APK di debug e lo pubblica come artefatto `tabletop-mobile-debug-apk`; il `versionCode` è il numero della build.
+  - `ios.yml`: sulle PR (o a mano) compila l'app iOS per il simulatore, senza firma, su un Mac di GitHub: verifica che iOS resti compilabile anche senza un Mac a disposizione.
+- **iOS sul dispositivo**: richiede un Mac con Xcode (o un servizio di build cloud) e un account Apple Developer. Il codice e il progetto sono già pronti.
