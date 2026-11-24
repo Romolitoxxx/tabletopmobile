@@ -1,4 +1,10 @@
-import { SandboxRules } from '@tabletop/core';
+import { createServer } from './server';
 
-// Placeholder entry point; the Colyseus server arrives in milestone 6.
-console.log(`Tabletop server placeholder — rules: ${SandboxRules.id}`);
+const port = Number(process.env.PORT ?? 2567);
+const server = createServer();
+await server.listen(port);
+console.log(`Tabletop server listening on ws://0.0.0.0:${port}`);
+
+const stop = () => void server.gracefullyShutdown(true);
+process.on('SIGINT', stop);
+process.on('SIGTERM', stop);

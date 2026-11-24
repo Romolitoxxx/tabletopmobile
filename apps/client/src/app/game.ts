@@ -1,5 +1,6 @@
 import {
   GameSession,
+  PLAYER_COLORS,
   type Player,
   type PlayerView,
   type RulesProvider,
@@ -11,8 +12,9 @@ import type { LoadedModule } from '@tabletop/module-format';
 
 /** solo: one player. hotseat: several players taking turns on the same device. */
 export type GameMode = 'solo' | 'hotseat';
+/** How the table is played: a local game, or one seat of an online game. */
+export type PlayMode = GameMode | 'online';
 
-export const PLAYER_COLORS = ['#ffca28', '#42a5f5', '#ef5350', '#66bb6a', '#ab47bc', '#ff7043'];
 export const MAX_HOTSEAT_PLAYERS = PLAYER_COLORS.length;
 
 /** A game as stored on the device. */
@@ -98,7 +100,7 @@ export function updateRecord(
  * In hotseat mode, the player who should get the device after an update:
  * the player whose turn it is, when it is not the one holding the device.
  */
-export function handoffTarget(mode: GameMode, view: PlayerView, holder: string): string | null {
+export function handoffTarget(mode: PlayMode, view: PlayerView, holder: string): string | null {
   if (mode !== 'hotseat') return null;
   const current = view.turn.current;
   if (!current || current === holder) return null;

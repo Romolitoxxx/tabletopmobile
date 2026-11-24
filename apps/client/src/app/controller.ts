@@ -18,7 +18,7 @@ import { HandBar } from '../ui/hand';
 import { LogPanel } from '../ui/log';
 import { askNumber, showGallery, showMenu, showZoom, toast, type ZoomAction } from '../ui/popups';
 import { componentName, formatEvent, playerName } from './format';
-import { type GameMode, handoffTarget } from './game';
+import { handoffTarget, type PlayMode } from './game';
 import { buildMenu, type MenuItem } from './menu';
 
 interface DragState {
@@ -45,7 +45,7 @@ export class GameController {
   private selection = new Set<string>();
   private drag: DragState | null = null;
   private fitted = false;
-  private mode: GameMode = 'solo';
+  private mode: PlayMode = 'solo';
   private switching = false;
 
   private readonly renderer: TableRenderer;
@@ -54,6 +54,7 @@ export class GameController {
   private readonly tableEl = h('div', { class: 'table' });
   private readonly toolbar = h('header', { class: 'toolbar' });
   private readonly turnLabel = h('span', { class: 'turn' });
+  private readonly badge = h('span', { class: 'online-code hidden' });
 
   constructor(
     private readonly root: HTMLElement,
@@ -100,7 +101,7 @@ export class GameController {
    * Attaches a game. With `handoff`, the device is first handed to the
    * player (hotseat): nothing of their view is shown before they confirm.
    */
-  async load(host: GameHost, playerId: string, mode: GameMode, handoff: boolean): Promise<void> {
+  async load(host: GameHost, playerId: string, mode: PlayMode, handoff: boolean): Promise<void> {
     this.detach();
     this.host = host;
     this.mode = mode;
@@ -145,6 +146,13 @@ export class GameController {
     this.switching = false;
     await this.attachPlayer(playerId);
     this.options.onChange(playerId);
+  }
+
+  /** Small status next to the turn (online: table code, red while offline). */
+  setBadge(text: string | null, warning = false): void {
+    this.badge.textContent = text ?? '';
+    this.badge.classList.toggle('hidden', text === null);
+    this.badge.classList.toggle('offline', warning);
   }
 
   /** Shows a frames-per-second counter (performance test). */
@@ -502,7 +510,7 @@ export class GameController {
     const button = (label: string, onclick: () => void, cls = '') =>
       h('button', { class: cls, onclick }, label);
     this.toolbar.replaceChildren(
-      this.turnLabel,
+      h('div', { class: 'status' }, this.turnLabel, this.badge),
       h(
         'div',
         { class: 'tools' },

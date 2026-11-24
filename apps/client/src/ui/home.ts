@@ -19,12 +19,15 @@ export interface HomeHandlers {
   onDelete(id: string): void;
   onImport(text: string): void;
   onLocale(): void;
+  onOnline(): void;
+  onRejoin(): void;
 }
 
 /** Start screen: continue, new game, saved games. */
 export class HomeScreen {
   readonly el = h('main', { class: 'home' });
   private saves: SaveSummary[] = [];
+  private rejoinCode: string | null = null;
 
   constructor(
     private readonly i18n: I18n,
@@ -33,6 +36,12 @@ export class HomeScreen {
 
   setSaves(saves: SaveSummary[]): void {
     this.saves = saves;
+    this.render();
+  }
+
+  /** Code of the online table this device can go back to, if any. */
+  setRejoin(code: string | null): void {
+    this.rejoinCode = code;
     this.render();
   }
 
@@ -130,6 +139,14 @@ export class HomeScreen {
             { class: latest ? 'big' : 'primary big', onclick: () => this.openNewGame() },
             t('home.newGame'),
           ),
+          this.rejoinCode
+            ? h(
+                'button',
+                { class: 'big', onclick: () => this.handlers.onRejoin() },
+                t('home.rejoin', { code: this.rejoinCode }),
+              )
+            : null,
+          h('button', { class: 'big', onclick: () => this.handlers.onOnline() }, t('home.online')),
         ),
         h('h2', {}, t('home.saved')),
         list,

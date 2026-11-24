@@ -12,5 +12,7 @@ export * from './rules/pipeline';
 export * from './view/view';
 export * from './log/session';
 export * from './host/host';
+export * from './net/protocol';
+export * from './net/remote';
 export * from './rng/rng';
 export type { JsonValue } from './util/json';

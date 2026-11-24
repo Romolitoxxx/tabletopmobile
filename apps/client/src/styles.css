@@ -268,6 +268,13 @@ button.primary {
   z-index: 5;
 }
 
+.toolbar .status {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .toolbar .turn {
   font-weight: 600;
   white-space: nowrap;
@@ -592,4 +599,48 @@ button.primary {
   background: rgba(0, 0, 0, 0.6);
   font: 600 13px monospace;
   pointer-events: none;
+}
+
+/* Online */
+.lobby .table-code {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-align: center;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  user-select: all;
+}
+
+.seats .seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.seats .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.seats li.away {
+  opacity: 0.55;
+}
+
+.dialog input.code {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.toolbar .online-code {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.toolbar .online-code.offline {
+  color: #ef5350;
 }
