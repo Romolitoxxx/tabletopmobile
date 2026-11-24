@@ -10,9 +10,14 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@tabletop/core": "workspace:*"
+    "@colyseus/core": "0.18.29",
+    "@colyseus/ws-transport": "^0.18.5",
+    "@tabletop/core": "workspace:*",
+    "@tabletop/module-format": "workspace:*",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@colyseus/sdk": "^0.18.10",
     "tsx": "^4.23.15"
   }
 }
