@@ -6,6 +6,12 @@ const config: CapacitorConfig = {
   appId: 'app.tabletopmobile',
   appName: 'Tabletop Mobile',
   webDir: 'dist',
+  android: {
+    // The page is served from https://localhost: without this, a game server
+    // on the local network (ws://, no TLS) could not be reached. Public servers
+    // should use wss:// anyway.
+    allowMixedContent: true,
+  },
   ios: {
     // The page handles safe areas itself (viewport-fit=cover + env()).
     contentInset: 'never',

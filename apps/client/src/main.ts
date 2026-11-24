@@ -4,6 +4,14 @@ import { BuiltinModuleLoader } from '@tabletop/module-format';
 import { GameController } from './app/controller';
 import { createGame, type GameRecord, restoreGame, updateRecord } from './app/game';
 import { detectLocale, I18n, type Locale } from './i18n/i18n';
+import {
+  normalizeCode,
+  normalizeServer,
+  onlineErrorCode,
+  OnlineSession,
+  type OnlineListener,
+  type OnlineTicket,
+} from './net/online';
 import { listenLifecycle, settings, shareTextFile } from './platform/platform';
 import { Assets } from './render/assets';
 import {
@@ -15,10 +23,42 @@ import {
 } from './storage/saves';
 import { h } from './ui/dom';
 import { HomeScreen, type NewGameChoice } from './ui/home';
+import { LobbyScreen, type OnlineChoice, showOnlineDialog } from './ui/online';
 import { toast } from './ui/popups';
 
 const LOCALE_KEY = 'tabletop.locale';
 const AUTOSAVE_DELAY_MS = 400;
+const SERVER_KEY = 'tabletop.online.server';
+const NAME_KEY = 'tabletop.online.name';
+const TICKET_KEY = 'tabletop.online.ticket';
+
+/** Server offered by default: build-time setting, else this host on the default port. */
+function defaultServer(): string {
+  const configured: unknown = import.meta.env.VITE_SERVER_URL;
+  if (typeof configured === 'string' && configured) return configured;
+  const secure = location.protocol === 'https:' && location.hostname !== 'localhost';
+  return `${secure ? 'wss' : 'ws'}://${location.hostname || 'localhost'}:2567`;
+}
+
+/** The seat this device can go back to (online), if any. */
+async function loadTicket(): Promise<OnlineTicket | null> {
+  try {
+    const t = JSON.parse((await settings.get(TICKET_KEY)) || 'null') as Partial<OnlineTicket>;
+    if (
+      t &&
+      typeof t.server === 'string' &&
+      typeof t.code === 'string' &&
+      typeof t.seatToken === 'string' &&
+      typeof t.name === 'string'
+    ) {
+      const { server, code, seatToken, name } = t;
+      return { server, code, seatToken, name, gameName: t.gameName ?? '' };
+    }
+  } catch {
+    // Corrupted: forget it.
+  }
+  return null;
+}
 
 async function loadLocale(): Promise<Locale | null> {
   const v = await settings.get(LOCALE_KEY);
@@ -49,6 +89,10 @@ class App {
   private readonly home: HomeScreen;
   private readonly controller: GameController;
   private current: { record: GameRecord; session: GameSession; active: string } | null = null;
+  private online: OnlineSession | null = null;
+  /** True once the online game is on screen (not the lobby). */
+  private onlinePlaying = false;
+  private readonly lobby: LobbyScreen;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly root: HTMLElement) {
@@ -60,12 +104,18 @@ class App {
       onDelete: (id) => void this.store.delete(id).then(() => this.showHome()),
       onImport: (text) => void this.importGame(text),
       onLocale: () => this.toggleLocale(),
+      onOnline: () => void this.openOnline(),
+      onRejoin: () => void this.rejoin(),
+    });
+    this.lobby = new LobbyScreen(this.i18n, {
+      onStart: () => this.online?.start(),
+      onLeave: () => void this.leaveOnline(),
     });
     this.controller = new GameController(this.gameRoot, new Assets(), this.i18n, {
-      onExit: () => void this.flush().then(() => this.showHome()),
+      onExit: () => void this.exitGame(),
       onChange: (active) => this.scheduleSave(active),
     });
-    root.append(this.home.el, this.gameRoot);
+    root.append(this.home.el, this.lobby.el, this.gameRoot);
     // Save before the app is closed or put in the background.
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void this.flush();
@@ -83,11 +133,17 @@ class App {
       top.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       return true;
     }
-    if (this.current) {
-      void this.flush().then(() => this.showHome());
+    if (this.current || this.online) {
+      void this.exitGame();
       return true;
     }
     return false;
+  }
+
+  private async exitGame(): Promise<void> {
+    if (this.online) return this.leaveOnline();
+    await this.flush();
+    await this.showHome();
   }
 
   async start(): Promise<void> {
@@ -108,13 +164,18 @@ class App {
     this.applyLocale();
     this.home.render();
     this.controller.refreshTexts();
+    if (this.online && !this.onlinePlaying)
+      this.lobby.render(this.online.table, this.online.playerId);
+    if (this.online && this.onlinePlaying) this.setOnlineBadge(false);
   }
 
   private async showHome(): Promise<void> {
     this.controller.detach();
     this.current = null;
     this.gameRoot.classList.add('hidden');
+    this.lobby.hide();
     this.home.el.classList.remove('hidden');
+    this.home.setRejoin((await loadTicket())?.code ?? null);
     try {
       this.home.setSaves(await this.store.list());
     } catch {
@@ -127,6 +188,7 @@ class App {
     this.home.el.classList.add('hidden');
     this.gameRoot.classList.remove('hidden');
     this.controller.showFps(record.moduleId === 'stress');
+    this.controller.setBadge(null);
     await this.controller.load(
       new LocalHost(session),
       record.activePlayerId,
@@ -181,6 +243,170 @@ class App {
     } catch {
       toast(this.i18n.t('home.importError'));
     }
+  }
+
+  // ---------- online ----------
+
+  private async openOnline(): Promise<void> {
+    const ticket = await loadTicket();
+    showOnlineDialog(
+      this.i18n,
+      {
+        server: (await settings.get(SERVER_KEY)) || defaultServer(),
+        name: (await settings.get(NAME_KEY)) || ticket?.name || '',
+        modules: this.loader.list().map((m) => ({ id: m.manifest.id, name: m.manifest.name })),
+      },
+      (choice) => void this.connect(choice),
+    );
+  }
+
+  private showLobby(): void {
+    this.home.el.classList.add('hidden');
+    this.gameRoot.classList.add('hidden');
+    this.lobby.show(null, '');
+  }
+
+  private async connect(choice: OnlineChoice): Promise<void> {
+    const server = normalizeServer(choice.server);
+    void settings.set(SERVER_KEY, choice.server.trim());
+    void settings.set(NAME_KEY, choice.name);
+    this.showLobby();
+    const listener = this.onlineListener();
+    try {
+      const session =
+        choice.kind === 'create'
+          ? await OnlineSession.create(
+              server,
+              { moduleId: choice.moduleId, gameName: choice.gameName, name: choice.name },
+              listener,
+            )
+          : await OnlineSession.join(
+              server,
+              normalizeCode(choice.code),
+              { name: choice.name },
+              listener,
+            );
+      await this.attachOnline(session);
+    } catch (e) {
+      this.onlineError(e);
+      await this.showHome();
+    }
+  }
+
+  /** Back to one's seat with the token kept on this device. */
+  private async rejoin(): Promise<void> {
+    const ticket = await loadTicket();
+    if (!ticket) return;
+    this.showLobby();
+    try {
+      const session = await OnlineSession.join(
+        ticket.server,
+        ticket.code,
+        { name: ticket.name, seatToken: ticket.seatToken },
+        this.onlineListener(),
+        ticket.gameName,
+      );
+      await this.attachOnline(session);
+    } catch (e) {
+      const code = this.onlineError(e);
+      // The table or the seat is gone for good.
+      if (code === 'bad_seat' || code === 'not_found') await settings.set(TICKET_KEY, '');
+      await this.showHome();
+    }
+  }
+
+  private onlineError(e: unknown): string {
+    const code = onlineErrorCode(e);
+    toast(this.i18n.t(`online.error.${code}`));
+    return code;
+  }
+
+  private async attachOnline(session: OnlineSession): Promise<void> {
+    this.online = session;
+    this.onlinePlaying = false;
+    await settings.set(TICKET_KEY, JSON.stringify(session.ticket));
+    this.lobby.render(session.table, session.playerId);
+    // The first view arrives when the game starts (at once if it already has).
+    void session.host.getView(session.playerId).then(() => {
+      if (this.online === session) void this.enterOnlineGame(session);
+    });
+  }
+
+  private async enterOnlineGame(session: OnlineSession): Promise<void> {
+    this.onlinePlaying = true;
+    this.lobby.hide();
+    this.home.el.classList.add('hidden');
+    this.gameRoot.classList.remove('hidden');
+    this.controller.showFps(session.table?.moduleId === 'stress');
+    await this.controller.load(session.host, session.playerId, 'online', false);
+    this.setOnlineBadge(false);
+  }
+
+  private setOnlineBadge(offline: boolean): void {
+    const code = this.online?.ticket.code;
+    if (code) this.controller.setBadge(this.i18n.t('toolbar.code', { code }), offline);
+  }
+
+  private onlineListener(): OnlineListener {
+    let previous: Map<string, boolean> | null = null;
+    return {
+      onTable: (info) => {
+        const session = this.online;
+        if (session && session.ticket.code === info.code) {
+          if (!this.onlinePlaying) this.lobby.render(info, session.playerId);
+          else if (previous) this.announceSeats(previous, info.seats, session.playerId);
+        }
+        previous = new Map(info.seats.map((s) => [s.playerId, s.connected]));
+      },
+      onConnection: (state) => {
+        if (!this.online) return;
+        if (state === 'reconnecting') {
+          this.setOnlineBadge(true);
+          toast(this.i18n.t('online.reconnecting'));
+        } else if (state === 'connected') {
+          this.setOnlineBadge(false);
+          toast(this.i18n.t('online.reconnected'));
+        } else {
+          // The transport gave up: during a game try once with the seat token.
+          const playing = this.onlinePlaying;
+          this.dropOnline();
+          toast(this.i18n.t('online.closed'));
+          if (playing) void this.rejoin();
+          else void this.showHome();
+        }
+      },
+    };
+  }
+
+  /** Tells who went offline or came back during the game. */
+  private announceSeats(
+    previous: Map<string, boolean>,
+    seats: { playerId: string; name: string; connected: boolean }[],
+    self: string,
+  ): void {
+    for (const s of seats) {
+      const was = previous.get(s.playerId);
+      if (s.playerId === self || was === undefined || was === s.connected) continue;
+      const key = s.connected ? 'online.playerBack' : 'online.playerLeft';
+      toast(this.i18n.t(key, { player: s.name }));
+    }
+  }
+
+  private dropOnline(): void {
+    const session = this.online;
+    this.online = null;
+    this.onlinePlaying = false;
+    session?.host.close();
+  }
+
+  /** Leaves the table. A lobby seat is given up; a game seat stays reserved. */
+  private async leaveOnline(): Promise<void> {
+    const session = this.online;
+    const started = this.onlinePlaying || session?.table?.phase === 'playing';
+    this.dropOnline();
+    if (!started) await settings.set(TICKET_KEY, '');
+    await session?.leave();
+    await this.showHome();
   }
 
   private scheduleSave(active: string): void {
