@@ -169,3 +169,13 @@ export function createGameState(init: GameStateInit): GameState {
     secret: { maskKey: init.maskKey },
   };
 }
+
+/** Default player colors, in seat order (hotseat and online). */
+export const PLAYER_COLORS: readonly string[] = [
+  '#ffca28',
+  '#42a5f5',
+  '#ef5350',
+  '#66bb6a',
+  '#ab47bc',
+  '#ff7043',
+];

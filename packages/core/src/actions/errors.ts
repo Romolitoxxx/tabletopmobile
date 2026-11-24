@@ -16,7 +16,8 @@ export type ErrorCode =
   | 'rejected_by_rules'
   | 'cascade_limit'
   | 'undo_not_allowed'
-  | 'nothing_to_undo';
+  | 'nothing_to_undo'
+  | 'offline';
 
 /** A refused action. `code` doubles as the i18n key (`error.<code>`). */
 export interface GameError {
