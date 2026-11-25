@@ -139,12 +139,30 @@ client C ─┘ submit / start             └─ welcome · table · update · 
 ```
 
 - **Server** (`apps/server`): `TableRoom` (adattatore Colyseus, `room.ts`) attorno a `OnlineTable` (`table.ts`), che non dipende dal trasporto ed è testata a parte. Il server riusa `LocalHost` del core: ogni client riceve **solo** `getViewFor`/`eventsFor` del proprio posto. Niente stato Schema di Colyseus.
-- **Protocollo** (`packages/core/src/net/protocol.ts`): opzioni di creazione/ingresso e messaggio `submit` validati con zod lato server; `PROTOCOL_VERSION` rifiuta app di versione diversa con l'errore `protocol`. Messaggi del server: `welcome` (posto + token segreto), `table` (informazioni pubbliche del tavolo), `update` (vista + eventi filtrati), `result` (esito di un `submit`, abbinato per `seq`).
+- **Protocollo** (`packages/core/src/net/protocol.ts`): opzioni di creazione/ingresso e messaggio `submit` validati con zod lato server; `PROTOCOL_VERSION` rifiuta app di versione diversa con l'errore `protocol`. Il client manda `ready` dopo aver registrato i suoi gestori: solo allora il server invia `welcome`, `table` e la vista (i messaggi arrivati prima di un gestore l'SDK li scarta). Messaggi del server: `welcome` (posto + token segreto), `table` (informazioni pubbliche del tavolo), `update` (vista + eventi filtrati), `result` (esito di un `submit`, abbinato per `seq`).
 - **Tavolo**: codice di 5 caratteri senza ambiguità (niente 0/O, 1/I) che è anche l'id della stanza. Chi crea il tavolo è il primo posto e il solo che può iniziare. In sala d'attesa ci si siede con un nome (2–6 posti; si può iniziare anche da soli); all'inizio la partita viene creata con quei giocatori, undo `strict`, seed e chiave delle maschere generati sul server con `crypto`. A partita iniziata non entra nessun altro.
 - **Riconnessione**, su due livelli:
   - caduta della connessione: l'SDK riprova da solo, il server tiene il posto per 60 s (`allowReconnection`) e alla ripresa rimanda la vista corrente;
   - rientro (app chiusa, connessione persa a lungo, tasto "Torna al tavolo"): ogni posto ha un **token segreto**, conservato sul dispositivo (Preferences, `tabletop.online.ticket`) e mai inviato agli altri. Con il token si torna allo stesso posto; una nuova connessione con lo stesso token sostituisce la precedente.
-- Il tavolo resta aperto anche se tutti si disconnettono e viene chiuso dopo 30 minuti senza nessuno connesso. **Limite noto**: le partite online vivono in memoria nel processo del server; un riavvio le perde (la persistenza lato server verrà dopo).
+- Il tavolo resta aperto anche se tutti si disconnettono; scadenza e salvataggio sono descritti in "Server pubblico (M7)".
 - **Client** (`apps/client/src/net/online.ts`): `OnlineSession` apre la stanza con `@colyseus/sdk` e fornisce un `RemoteHost` al `GameController`, che non sa se la partita è locale o online (modalità `online`: niente passaggio del dispositivo, codice del tavolo nella barra, rosso mentre la connessione è assente). Mentre si è offline le azioni sono rifiutate subito con `error.offline`.
 - **Indirizzo del server**: si scrive nel dialogo "Gioca online" (`192.168.1.5:2567` diventa `ws://192.168.1.5:2567`) e viene ricordato; il valore iniziale è `VITE_SERVER_URL` se definita al build, altrimenti l'host della pagina sulla porta 2567. Per provare in rete locale Android permette `ws://` (cleartext e contenuto misto) e iOS le connessioni locali (`NSAllowsLocalNetworking`); un server pubblico deve usare `wss://`.
-- Limite dei messaggi in ingresso: 64 KB.
+- Limite dei messaggi in ingresso: 64 KB; al massimo 15 messaggi al secondo per client (raffiche fino a 30), oltre i quali l'azione è rifiutata con `error.rate_limited`.
+
+## Server pubblico (M7)
+
+- **Persistenza** (`apps/server/src/store.ts`): ogni tavolo è un documento JSON in SQLite (`node:sqlite`, incluso in Node 22: nessun modulo nativo da compilare), nel file `$DATA_DIR/tables.sqlite`. Contiene la sala d'attesa, i token dei posti e il `SavedGame` della partita (stato iniziale + log + RNG): **segreti**, li legge solo il server. Le scritture sono raggruppate (1 s dopo l'ultima modifica) e fatte subito quando la stanza viene chiusa (spegnimento, deploy). Un arresto brusco perde al massimo l'ultimo secondo.
+- **Riavvio**: all'avvio `restoreTables` riapre tutti i tavoli salvati **prima** di aprire la porta (`GatedTransport`), così il primo client, quello che su Fly.io ha risvegliato la macchina, trova il suo tavolo. Un client non può chiedere un ripristino: solo il server lo autorizza (`allowRestore`). I giocatori rientrano con il loro token; se la partita si interrompe durante il gioco, l'app ritenta da sola per circa 30 s.
+- **Scadenza**: una sala d'attesa senza nessuno connesso viene chiusa dopo 30 minuti, una partita dopo 7 giorni senza attività; il tavolo viene allora cancellato anche dal database.
+- **`/health`** risponde `{"ok":true}` per i controlli della piattaforma.
+- **Immagine Docker** (`apps/server/Dockerfile`, contesto = radice del repository): installa solo le dipendenze del server, esegue il TypeScript con `tsx`, ascolta su `PORT` (8080) e salva in `DATA_DIR` (`/data`). Il workflow `server.yml` la costruisce e la avvia a ogni push/PR.
+- **Fly.io** (`fly.toml`): una macchina piccola con un volume `tabletop_data` montato su `/data`, HTTPS/`wss://` automatico, macchina spenta quando nessuno è connesso e riaccesa alla prima connessione.
+- **Indirizzo nell'app**: la variabile di repository `SERVER_URL` (es. `wss://tabletop-mobile.fly.dev`) viene passata come `VITE_SERVER_URL` ai build Android e iOS e diventa l'indirizzo proposto in "Gioca online". Chi ha già usato un altro indirizzo lo vede ancora (è ricordato): basta correggerlo una volta.
+
+### Messa online su Fly.io (una volta)
+
+1. Crea un account su fly.io e installa `flyctl` (`winget install flyctl` oppure https://fly.io/docs/flyctl/install/), poi `fly auth login`.
+2. Scegli un nome libero per l'app e scrivilo in `fly.toml` (`app = "..."`).
+3. Dalla radice del repository: `fly apps create <nome>`, poi `fly volumes create tabletop_data --region fra --size 1`, poi `fly deploy`. Con il volume la macchina è una sola (SQLite non si condivide tra macchine): se `fly scale show` ne mostra due, `fly scale count 1`.
+4. Prova: `https://<nome>.fly.dev/health` deve rispondere `{"ok":true}`.
+5. Su GitHub (Settings → Secrets and variables → Actions): variabile `SERVER_URL` = `wss://<nome>.fly.dev`; per il deploy automatico a ogni push su `main`, segreto `FLY_API_TOKEN` (da `fly tokens create deploy`) e variabile `FLY_DEPLOY` = `true`.
