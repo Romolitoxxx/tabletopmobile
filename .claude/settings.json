@@ -1,0 +1,12 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-mods": {
+      "source": { "source": "github", "repo": "Romolitoxxx/claude-mods" }
+    }
+  },
+  "enabledPlugins": {
+    "effort-picker@claude-mods": true,
+    "context-meter@claude-mods": true,
+    "cold-chat@claude-mods": true
+  }
+}
