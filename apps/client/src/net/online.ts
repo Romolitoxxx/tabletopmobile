@@ -141,9 +141,10 @@ export class OnlineSession {
     gameName: string,
     listener: OnlineListener,
   ): Promise<OnlineSession> {
-    // The server sends `welcome` right after accepting the join.
+    // The server sends nothing until `ready`: messages that arrive before a
+    // handler is registered are dropped by the SDK. `welcome` comes first and
+    // its handler creates the session (and the `update` listener) at once.
     return new Promise((resolve, reject) => {
-      // Table info may arrive before the session object exists: keep the last one.
       let info: TableInfo | null = null;
       const offTable = room.onMessage('table', (t: TableInfo) => (info = t));
       const offWelcome = room.onMessage('welcome', (w: ServerMessages['welcome']) => {
@@ -162,6 +163,7 @@ export class OnlineSession {
         resolve(session);
       });
       room.onLeave(() => reject(new Error('unreachable')));
+      room.send('ready');
     });
   }
 
