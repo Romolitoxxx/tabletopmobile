@@ -137,6 +137,7 @@ export const it: Record<MessageKey, string> = {
   'error.undo_not_allowed': 'Questa azione non si può annullare',
   'error.nothing_to_undo': 'Niente da annullare',
   'error.offline': 'Non connesso al server',
+  'error.rate_limited': 'Troppe azioni: rallenta un momento',
   'toolbar.code': 'Tavolo {code}',
   'home.online': 'Gioca online',
   'home.rejoin': 'Torna al tavolo online {code}',

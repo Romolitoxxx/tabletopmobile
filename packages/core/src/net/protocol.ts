@@ -5,7 +5,7 @@ import type { HostSubmitResult, HostUpdate } from '../host/host';
 // the transport (Colyseus) lives in the apps. Everything a client sends is
 // untrusted and validated with these schemas.
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const MAX_ONLINE_PLAYERS = 6;
 export const ROOM_NAME = 'table';
 
@@ -28,7 +28,13 @@ export const JoinOptions = z.object({
 });
 export type JoinOptions = z.infer<typeof JoinOptions>;
 
-/** Client → server. */
+/**
+ * Client → server messages:
+ * - `ready` (no payload): sent once the client listens; only then does the
+ *   server send `welcome`, `table` and the current view;
+ * - `start` (no payload): the owner deals the game;
+ * - `submit`: an action, answered by `result` with the same `seq`.
+ */
 export const SubmitMessage = z.object({ seq: z.int().min(0), action: z.unknown() });
 export type SubmitMessage = z.infer<typeof SubmitMessage>;
 

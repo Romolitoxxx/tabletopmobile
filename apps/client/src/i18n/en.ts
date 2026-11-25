@@ -136,6 +136,7 @@ export const en = {
   'error.undo_not_allowed': 'This action cannot be undone',
   'error.nothing_to_undo': 'Nothing to undo',
   'error.offline': 'Not connected to the server',
+  'error.rate_limited': 'Too many actions: slow down a moment',
   'toolbar.code': 'Table {code}',
   'home.online': 'Play online',
   'home.rejoin': 'Back to online table {code}',
