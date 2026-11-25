@@ -13,6 +13,7 @@ import {
   type TableInfo,
 } from '@tabletop/core';
 import type { LoadedModule } from '@tabletop/module-format';
+import type { StoredTable } from './store';
 
 /** Where the table sends messages; one id per connected client. */
 export interface Outbox {
@@ -41,6 +42,8 @@ export interface TableOptions {
   outbox: Outbox;
 }
 
+export type TableSnapshot = Omit<StoredTable, 'version' | 'lastActive'>;
+
 export type JoinResult =
   | {
       ok: true;
@@ -61,6 +64,39 @@ export class OnlineTable {
   private nextSeat = 1;
 
   constructor(private readonly opts: TableOptions) {}
+
+  /** Brings back a table saved with `snapshot()`; everybody starts disconnected. */
+  static restore(stored: TableSnapshot, opts: TableOptions): OnlineTable {
+    const table = new OnlineTable(opts);
+    table.phase = stored.phase;
+    table.nextSeat = stored.nextSeat;
+    for (const s of stored.seats)
+      table.seats.push({ ...s, clientId: null, online: false, unsubscribe: null });
+    if (stored.save) table.host = new LocalHost(GameSession.load(stored.save, SandboxRules));
+    return table;
+  }
+
+  /** Everything needed to restore the table, secrets included: never send it to a client. */
+  snapshot(): TableSnapshot {
+    return {
+      code: this.opts.code,
+      gameName: this.opts.gameName,
+      moduleId: this.opts.module.manifest.id,
+      phase: this.phase,
+      seats: this.seats.map(({ playerId, name, color, token }) => ({
+        playerId,
+        name,
+        color,
+        token,
+      })),
+      nextSeat: this.nextSeat,
+      save: this.host?.session.save() ?? null,
+    };
+  }
+
+  get started(): boolean {
+    return this.phase === 'playing';
+  }
 
   get code(): string {
     return this.opts.code;
@@ -119,12 +155,24 @@ export class OnlineTable {
       };
       this.seats.push(seat);
     }
+    // Nothing is sent before the client says it is listening (`ready`).
     seat.clientId = clientId;
-    seat.online = true;
-    this.opts.outbox.send(clientId, 'welcome', { playerId: seat.playerId, seatToken: seat.token });
-    this.attach(seat);
+    seat.online = false;
     this.broadcastInfo();
     return { ok: true, playerId: seat.playerId, replaced };
+  }
+
+  /**
+   * The client has set up its listeners: it gets its seat, the table and,
+   * during a game, its current view, then every update.
+   */
+  ready(clientId: string): void {
+    const seat = this.seats.find((s) => s.clientId === clientId);
+    if (!seat || seat.online) return;
+    seat.online = true;
+    this.opts.outbox.send(clientId, 'welcome', { playerId: seat.playerId, seatToken: seat.token });
+    this.broadcastInfo();
+    this.attach(seat);
   }
 
   /** A client came back on the same connection id (transport-level reconnection). */

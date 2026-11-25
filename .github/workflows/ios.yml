@@ -18,6 +18,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tabletop/client build
+        env:
+          # Public game server offered by default (repository variable, optional).
+          VITE_SERVER_URL: ${{ vars.SERVER_URL }}
       - name: Copy the web app into the iOS project
         working-directory: apps/client
         run: pnpm exec cap sync ios

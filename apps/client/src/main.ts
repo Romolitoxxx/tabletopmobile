@@ -31,6 +31,9 @@ const AUTOSAVE_DELAY_MS = 400;
 const SERVER_KEY = 'tabletop.online.server';
 const NAME_KEY = 'tabletop.online.name';
 const TICKET_KEY = 'tabletop.online.ticket';
+/** Automatic rejoin after losing the table: tries for about half a minute. */
+const REJOIN_ATTEMPTS = 10;
+const REJOIN_DELAY_MS = 3000;
 
 /** Server offered by default: build-time setting, else this host on the default port. */
 function defaultServer(): string {
@@ -294,24 +297,36 @@ class App {
   }
 
   /** Back to one's seat with the token kept on this device. */
-  private async rejoin(): Promise<void> {
+  /**
+   * Back to one's seat with the token kept on this device. `attempts` > 1
+   * retries while the server is unreachable (e.g. restarting after a deploy).
+   */
+  private async rejoin(attempts = 1): Promise<void> {
     const ticket = await loadTicket();
     if (!ticket) return;
     this.showLobby();
-    try {
-      const session = await OnlineSession.join(
-        ticket.server,
-        ticket.code,
-        { name: ticket.name, seatToken: ticket.seatToken },
-        this.onlineListener(),
-        ticket.gameName,
-      );
-      await this.attachOnline(session);
-    } catch (e) {
-      const code = this.onlineError(e);
-      // The table or the seat is gone for good.
-      if (code === 'bad_seat' || code === 'not_found') await settings.set(TICKET_KEY, '');
-      await this.showHome();
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const session = await OnlineSession.join(
+          ticket.server,
+          ticket.code,
+          { name: ticket.name, seatToken: ticket.seatToken },
+          this.onlineListener(),
+          ticket.gameName,
+        );
+        await this.attachOnline(session);
+        return;
+      } catch (e) {
+        if (onlineErrorCode(e) === 'unreachable' && attempt < attempts) {
+          await new Promise((r) => setTimeout(r, REJOIN_DELAY_MS));
+          continue;
+        }
+        const code = this.onlineError(e);
+        // The table or the seat is gone for good.
+        if (code === 'bad_seat' || code === 'not_found') await settings.set(TICKET_KEY, '');
+        await this.showHome();
+        return;
+      }
     }
   }
 
@@ -371,7 +386,7 @@ class App {
           const playing = this.onlinePlaying;
           this.dropOnline();
           toast(this.i18n.t('online.closed'));
-          if (playing) void this.rejoin();
+          if (playing) void this.rejoin(REJOIN_ATTEMPTS);
           else void this.showHome();
         }
       },

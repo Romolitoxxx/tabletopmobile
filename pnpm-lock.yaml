@@ -99,6 +99,9 @@ importers:
       '@tabletop/module-format':
         specifier: workspace:*
         version: link:../../packages/module-format
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -106,9 +109,6 @@ importers:
       '@colyseus/sdk':
         specifier: ^0.18.10
         version: 0.18.10(@colyseus/core@0.18.29)(typescript@6.0.3)(zod@4.6.7)
-      tsx:
-        specifier: ^4.23.15
-        version: 4.23.15
 
   packages/core:
     dependencies:

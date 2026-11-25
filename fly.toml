@@ -1,0 +1,43 @@
+# Fly.io configuration of the game server (see docs/ARCHITECTURE.md, "Server pubblico").
+# `app` must be unique on Fly: change it before the first `fly launch` / `fly deploy`.
+app = "tabletop-mobile"
+primary_region = "fra"
+kill_signal = "SIGTERM"
+kill_timeout = "15s"
+
+[build]
+  dockerfile = "apps/server/Dockerfile"
+
+[env]
+  PORT = "8080"
+  DATA_DIR = "/data"
+
+# SQLite database of the tables: survives restarts and deploys.
+[mounts]
+  source = "tabletop_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The machine sleeps when nobody is connected and wakes on the next connection;
+  # the tables are saved on the volume and reopened at start.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 400
+    hard_limit = 500
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

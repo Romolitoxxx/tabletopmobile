@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/*.test.ts
+**/data
+.git
+.github
+.claude
+apps/client
+docs

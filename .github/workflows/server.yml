@@ -1,0 +1,38 @@
+name: Server
+
+on:
+  push:
+    branches: [main, 'm*-*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  image:
+    # Checks that the Docker image of the game server builds and starts.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/server/Dockerfile -t tabletop-server .
+      - name: Start the image and call the health check
+        run: |
+          docker run -d --name server -p 8080:8080 tabletop-server
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs server
+          exit 1
+
+  deploy:
+    # Deploys to Fly.io from main, once the repository variable FLY_DEPLOY is
+    # "true" and the secret FLY_API_TOKEN exists.
+    needs: image
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.FLY_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    concurrency: fly-deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
